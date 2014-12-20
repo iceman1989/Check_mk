@@ -415,10 +415,43 @@ def snmp_decode_string(text):
 #   | Non-inline SNMP handling code. Kept for compatibility.               |
 #   '----------------------------------------------------------------------'
 
+# required function for IPv6 support
+def tags_of_host(hostname):
+    global hosttags
+    return hosttags.get(hostname, [])
+
+# required function for IPv6 support
+def hosttags_match_taglist(hosttags, required_tags):
+    for tag in required_tags:
+        if len(tag) > 0 and tag[0] == '!':
+            negate = True
+            tag = tag[1:]
+        else:
+            negate = False
+
+        if tag and tag[-1] == '+':
+            tag = tag[:-1]
+            matches = False
+            for t in hosttags:
+                if t.startswith(tag):
+                    matches = True
+                    break
+        else:
+            matches = (tag in hosttags)
+
+        if matches == negate:
+            return False
+
+    return True
+
 def snmpwalk_on_suboid(hostname, ip, oid, hex_plain = False):
     portspec = snmp_port_spec(hostname)
-    command = snmp_walk_command(hostname) + \
-             " -OQ -OU -On -Ot %s%s %s" % (ip, portspec, oid)
+    if hosttags_match_taglist(tags_of_host(hostname), [ 'ipv6' ]):
+        command = snmp_walk_command(hostname) + \
+             " -OQ -OU -On -Ot udp6:[%s]%s %s" % (ip, portspec, oid)
+    else:
+        command = snmp_walk_command(hostname) + \
+              " -OQ -OU -On -Ot %s%s %s" % (ip, portspec, oid)
     if opt_debug:
         sys.stderr.write('   Running %s\n' % (command,))
 

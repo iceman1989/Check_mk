@@ -108,6 +108,7 @@ check_mk_configdir                 = default_config_dir + "/conf.d"
 checks_dir                         = '/usr/share/check_mk/checks'
 notifications_dir                  = '/usr/share/check_mk/notifications'
 inventory_dir                      = '/usr/share/check_mk/inventory'
+defaults_path                      = '/usr/share/check_mk/modules/defaults'
 agents_dir                         = '/usr/share/check_mk/agents'
 check_manpages_dir                 = '/usr/share/doc/check_mk/checks'
 modules_dir                        = '/usr/share/check_mk/modules'
@@ -709,7 +710,13 @@ def snmp_get_oid(hostname, ipaddress, oid):
         commandtype = "get"
 
     portspec = snmp_port_spec(hostname)
-    command = snmp_base_command(commandtype, hostname) + \
+    
+    # IPv6 support for SNMP Hosts
+    if hosttags_match_taglist(tags_of_host(hostname), [ 'ipv6' ]):
+        command = snmp_base_command(commandtype, hostname) + \
+              " -On -OQ -Oe -Ot udp6:[%s]%s %s" % (ipaddress, portspec, oid_prefix)
+    else:
+        command = snmp_base_command(commandtype, hostname) + \
               " -On -OQ -Oe -Ot %s%s %s" % (ipaddress, portspec, oid_prefix)
 
     if opt_debug:
@@ -1148,7 +1155,12 @@ def lookup_ipaddress(hostname):
 
     # Now do the actual DNS lookup
     try:
-        ipa = socket.gethostbyname(hostname)
+        # ipv6 enabled hostname lookups
+        if hosttags_match_taglist(tags_of_host(hostname), [ 'ipv6' ]): 
+            ipaddrinfo = socket.getaddrinfo(hostname, None)
+            ipa = ipaddrinfo[0][4][0]
+        else:
+            ipa = socket.gethostbyname(hostname)
 
         # Update our cached address if that has changed or was missing
         if ipa != cached_ip:
@@ -3281,7 +3293,7 @@ no_inventory_possible = None
                  'piggyback_max_cachefile_age',
                  'simulation_mode', 'agent_simulator', 'aggregate_check_mk',
                  'check_mk_perfdata_with_times', 'livestatus_unix_socket',
-                 'use_inline_snmp', 'record_inline_snmp_stats',
+                 'use_inline_snmp', 'record_inline_snmp_stats', 'hosttags'
                  ]:
         output.write("%s = %r\n" % (var, globals()[var]))
 

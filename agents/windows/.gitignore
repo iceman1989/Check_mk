@@ -1,0 +1,6 @@
+check_mk.ini
+logstate.txt
+spool
+success.log
+*.res
+*.rc

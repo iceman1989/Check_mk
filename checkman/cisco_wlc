@@ -1,0 +1,30 @@
+title: Cisco Wireless Lan Controller (WLC): Connected Wlan accesspoints
+agents: snmp
+catalog: hw/network/cisco
+license: GPL
+distribution: check_mk
+description:
+ This check automatically detects all online accesspoints and checks for the current status.
+ If an accesspoint is not longer reachable, the checks also triggers a critical state.
+ The checks directly connects to a Cisco Wireless Lan Controller. Currently its tested
+ with the model 5508.
+
+inventory:
+ One check for each online accesspoint is created
+
+examples:
+ checkgroup_parameters.setdefault('cisco_wlc', [])
+
+ checkgroup_parameters['cisco_wlc'] = [
+   ( {'ap_name': [('HOMEOFFICE', 0), ('FALLBACK', 2)]}, [], ALL_HOSTS, ALL_SERVICES ),
+ ] + checkgroup_parameters['cisco_wlc']
+
+
+[parameters]
+parameters(dict): with the key "ap_name"
+
+ The values in this dict are lists of tuples. Each tuple contains (ap_name(string), action(int))
+ where the ap_name is the human readable name of the AP.
+ The action represents the outcome when this name missing and
+ ranges from 0 to 3 (OK, WARN, CRIT, UNKNOWN)
+

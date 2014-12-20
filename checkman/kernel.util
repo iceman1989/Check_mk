@@ -1,0 +1,33 @@
+title: CPU utilization
+agents: linux
+catalog: os/kernel
+license: GPL
+distribution: check_mk
+description:
+ This check measures the CPU utilization during the last check
+ cycle. Levels can be set on the total utilization and also
+ specifically on the disk wait (IO wait).
+
+perfdata:
+ Three variables: The percentage of time spent in {user}, {system} and {wait}
+ (disk wait). The idle time can be computed by substracting those three values
+ from 100%. The user value contains also {nice}.
+
+inventory:
+ One check per host is created if the agent contains a {kernel}
+ section containing cpu information. The inventory creates the
+ check with the parameter {kernel_util_default_levels}, which is
+ preset to {None} thus imposing no levels and making the check always OK.
+
+[parameters]
+dictionary: A dictionary for two keys, both of which are optional:
+
+  {"iowait"} a pair of float values with percentages for warning and critical
+  for the disk wait
+
+  {"util"} a pair of float values with percentages for warning and critical
+  for the total utilization
+
+[configuration]
+kernel_util_default_levels (dictionary): Default levels used by inventorized
+  checks. The default is not to impose any levels.

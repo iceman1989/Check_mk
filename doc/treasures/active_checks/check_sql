@@ -1,0 +1,294 @@
+#!/usr/bin/python
+# -*- encoding: utf-8; py-indent-offset: 4 -*-
+# +------------------------------------------------------------------+
+# |             ____ _               _        __  __ _  __           |
+# |            / ___| |__   ___  ___| | __   |  \/  | |/ /           |
+# |           | |   | '_ \ / _ \/ __| |/ /   | |\/| | ' /            |
+# |           | |___| | | |  __/ (__|   <    | |  | | . \            |
+# |            \____|_| |_|\___|\___|_|\_\___|_|  |_|_|\_\           |
+# |                                                                  |
+# | Copyright Mathias Kettner 2013             mk@mathias-kettner.de |
+# +------------------------------------------------------------------+
+#
+# This file is part of Check_MK.
+# The official homepage is at http://mathias-kettner.de/check_mk.
+#
+# check_mk is free software;  you can redistribute it and/or modify it
+# under the  terms of the  GNU General Public License  as published by
+# the Free Software Foundation in version 2.  check_mk is  distributed
+# in the hope that it will be useful, but WITHOUT ANY WARRANTY;  with-
+# out even the implied warranty of  MERCHANTABILITY  or  FITNESS FOR A
+# PARTICULAR PURPOSE. See the  GNU General Public License for more de-
+# ails.  You should have  received  a copy of the  GNU  General Public
+# License along with GNU Make; see the file  COPYING.  If  not,  write
+# to the Free Software Foundation, Inc., 51 Franklin St,  Fifth Floor,
+# Boston, MA 02110-1301 USA.
+
+# DB2 support requires installation of the IBM Data Server Client:
+#  http://www-01.ibm.com/support/docview.wss?uid=swg27016878
+# as well as the ibm_db2 Python DBI driver for DB2:
+#  https://pypi.python.org/pypi/ibm_db
+
+import sys, getopt
+
+def usage():
+    sys.stderr.write("""Check_MK SQL Test
+
+USAGE: check_sql [OPTIONS] SQL-Statement|SQL-Procedure
+       check_sql -h
+
+ARGUMENTS:
+  SQL-Statement|Procedure       Valid SQL-Statement for the selected database
+                                The statement must return at least a number and a string,
+                                plus optional performance data.
+                                Alternatively: If the the "-o" option is given, treat the argument as
+                                a procedure name. The procedure must return one output variable,
+                                which content is evaluated the same way as the output of the
+                                SQL-Statement
+
+OPTIONS:
+  -h, --help                    Show this help message and exit
+  -u USER,  --user USER         Username for database access
+  -p PASS,  --password PASS     Password for database access
+  -d DBMS,  --dbms DBMS         Name of the database management system.
+                                Default is 'postgres', other valid values are
+                                'mysql', 'mssql', 'oracle' and 'db2'
+  -H HOST,  --hostname HOST     Hostname or IP-Address where the database lives. Default is '127.0.0.1'
+  -P PORT,  --port PORT         Port used to connect to the database
+  -n NAME,  --name NAME         Name of the database on the DBMS
+  -w RANGE, --warning RANGE     lower and upper level for the warning state, separated by a colon
+  -c RANGE, --critical RANGE    lower and upper level for the critical state, separated by a colon
+  -o, --procedure               treat the main argument as a procedure instead of an SQL-Statement
+  -i CSV,   --inputvars CSV     values of input variables if required by the procedure; csv-list
+  --debug                       Debug mode: let Python exceptions come through
+  -v, --verbose                 Verbose mode: print SQL statement and levels
+
+""")
+
+def saverfloat(f):
+    if f == "":
+        return None
+    else:
+        return float(f)
+
+#
+# defining and collection input parameters
+#
+short_options = 'hou:i:p:d:n:H:P:w:c:v'
+long_options  = [
+    'help', 'user=', 'password=', 'dbms=', 'name=', 'warning=', 'critical=', 'hostname=',
+    'port=', 'debug', 'verbose', 'procedure', 'inputvars='
+]
+
+try:
+    opts, args = getopt.getopt(sys.argv[1:], short_options, long_options)
+
+except getopt.GetoptError, e:
+    print "UNKOWN - Error in command options: %s" % e
+    sys.exit(3)
+
+opt_debug         = False
+opt_verbose       = False
+opt_dbms          = "postgres"
+opt_name          = None
+opt_user          = opt_dbms
+opt_password      = None
+opt_hostname      = "127.0.0.1"
+opt_port          = None
+opt_sql           = None
+opt_input         = []
+opt_procedure     = False
+warn              = [ None, None ]
+crit              = [ None, None ]
+
+try:
+    for o,a in opts:
+        if o in [ '--debug' ]:
+            opt_debug = True
+        elif o in [ '-v', '--verbose' ]:
+            opt_verbose = True
+        elif o in [ '-d', '--dbms' ]:
+            opt_dbms = a
+        elif o in [ '-n', '--name' ]:
+            opt_name = a
+        elif o in [ '-u', '--user' ]:
+            opt_user = a
+        elif o in [ '-p', '--password' ]:
+            opt_password = a
+        elif o in [ '-H', '--hostname' ]:
+            opt_hostname = a
+        elif o in [ '-P', '--port' ]:
+            opt_port = int(a)
+        elif o in [ '-w', '--warning' ]:
+            warn = map(saverfloat,a.split(":",2))
+        elif o in [ '-c', '--critical' ]:
+            crit = map(saverfloat,a.split(":",2))
+        elif o in [ '-o', '--procedure' ]:
+            opt_procedure = True
+        elif o in [ '-i', '--inputvars' ]:
+            opt_input = a.split(",")
+        elif o in [ '-h', '--help' ]:
+            usage()
+            sys.exit(0)
+
+    if args:
+        opt_sql_tmp = ' '.join(map(str,args))
+        opt_sql = opt_sql_tmp.replace(r"\n", "\n").replace('\;', ";")
+    else:
+        print "UNKNOWN - no SQL statement/procedure name given"
+        sys.exit(3)
+
+except Exception, e:
+    if opt_debug:
+        raise
+    print "UNKNOWN - Error while processing input: %s" % e
+    sys.exit(3)
+
+
+#
+# database connection
+#
+try:
+
+    if opt_dbms == "postgres":
+        import psycopg2 # postgres driver
+        db = psycopg2
+        if opt_port == None:
+            opt_port=5432
+        db_connection = db.connect(host=opt_hostname, port=opt_port, \
+            database=opt_name, user=opt_user, password=opt_password )
+
+    elif opt_dbms == "mysql":
+        import MySQLdb  # mysql driver
+        db = MySQLdb
+        if opt_port == None:
+            opt_port=3306
+        db_connection = db.connect(host=opt_hostname, port=opt_port, \
+            db=opt_name, user=opt_user, passwd=opt_password )
+
+    elif opt_dbms == "mssql":
+        import pymssql  # mssql driver
+        db = pymssql
+        if opt_port == None:
+            opt_port=1433
+        db_connection = db.connect(host=opt_hostname+":"+str(opt_port), \
+            database=opt_name, user=opt_user, password=opt_password )
+
+    elif opt_dbms == "oracle":
+        sys.path.append('/usr/lib/python2.6/site-packages')
+        sys.path.append('/usr/lib/python2.7/site-packages')
+        import cx_Oracle
+        db = cx_Oracle
+        if opt_port == None:
+            opt_port=1521
+        cstring = opt_user+"/"+opt_password+"@"+opt_hostname+":"+str(opt_port)+"/"+opt_name
+        db_connection = db.connect(cstring)
+
+    elif opt_dbms == "db2":
+        import ibm_db  # IBM data server driver
+        import ibm_db_dbi
+        db = ibm_db
+        if opt_port == None:
+            opt_port=50000
+        cstring = 'DRIVER={IBM DB2 ODBC DRIVER};DATABASE='+opt_name+ \
+            ';HOSTNAME='+opt_hostname+';PORT='+str(opt_port)+';PROTOCOL=TCPIP;'+ \
+           'UID='+opt_user+';PWD='+opt_password+';'
+        ibm_db_conn = db.connect(cstring,'','')
+        db_connection = ibm_db_dbi.Connection(ibm_db_conn)
+
+    else:
+        print "UNKNOWN - dbms not found"
+        sys.exit(3)
+
+    cursor = db_connection.cursor()
+
+except Exception, e:
+    if len(e.args) > 1:
+        print "UNKNOWN - Error while connecting to database: [%d] %s" % (e.args[0], e.args[1])
+    else:
+        print "UNKNOWN - Error while connecting to database: %s" % e
+    sys.exit(3)
+
+#
+# excecuting the sql statement
+#
+try:
+    if opt_verbose:
+        if opt_procedure:
+            sys.stderr.write("SQL Procedure Name: %s\n" % opt_sql)
+            sys.stderr.write("Input Values: %s\n" % opt_input)
+        else:
+            sys.stderr.write("SQL Statement: %s\n" % opt_sql)
+    if opt_procedure:
+        outvar = cursor.var(cx_Oracle.STRING)
+        #opt_input.append("outvar")
+        cursor.callproc(opt_sql, (outvar,))
+        res =  outvar.getvalue()
+        if opt_dbms == "mssql":
+            result = res[0].split(",")
+        else:
+            result = res.split(",")
+    else:
+        cursor.execute(opt_sql)
+        result = cursor.fetchone()
+    cursor.close()
+    db_connection.close()
+
+except Exception, e:
+    if opt_debug:
+        raise
+    if len(e.args) > 1:
+        print "UNKNOWN - Error while executing SQL statement/procedure: [%d] %s" % (e.args[0], e.args[1])
+    else:
+        print "UNKNOWN - Error while executing SQL statement/procedure: %s" % e
+    sys.exit(3)
+
+if opt_verbose:
+    sys.stderr.write("\nSQL Result:\n %s\n\n" % result)
+
+#
+# processing of result
+#
+try:
+    #if len(result) > 1:
+    #    print "UNKNOWN - SQL statement/procedure returned more than one line"
+    #    sys.exit(3)
+    if result == None or len(result) == 0:
+        print "UNKNOWN - SQL statement/procedure returned no data"
+        sys.exit(3)
+
+    number = float(result[0])
+    text = str(result[1])
+
+    try:
+        perf = "|"+str(result[2])
+    except IndexError:
+        if opt_debug:
+            raise
+        perf = ""  # no perf data
+
+    state = 0
+    if warn != [ None, None] or crit != [ None, None ]:
+        if (warn[0] != None and warn[0] > number) or \
+           (warn[1] != None and warn[1] < number):
+            state = 1
+        if (crit[0] != None and crit[0] > number) or \
+           (crit[1] != None and crit[1] < number):
+            state = 2
+    else:
+        if number  in [ 0 ,1 ,2 ,3 ]:
+            state = int(number)
+        else:
+            print "UNKNOWN - <%s> is not a state, and no levels given" % str(number)
+            sys.exit(3)
+
+except Exception, e:
+    if opt_debug:
+        raise
+    print "UNKNOWN - Error while processing result of SQL statement: %s" % e
+    sys.exit(3)
+
+result = ["OK", "WARN", "CRIT", "UNKNOWN" ][state]
+print "%s - %s %s %s" % (result, number, text, perf)
+sys.exit(state)
+

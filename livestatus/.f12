@@ -1,0 +1,21 @@
+#!/bin/bash
+SITE=${SITE:-$(cat ../.site 2>/dev/null || true)}
+SITE=${SITE:-$(omd sites --bare | head -n 1)}
+
+set -e
+if [ ! -f configure ]; then
+    automake --add-missing
+    aclocal && autoheader && automake -a && autoconf
+fi
+
+if [ ! -f Makefile ]; then
+    ./configure
+fi
+
+make CFLAGS=-g -j 8
+
+
+sudo install src/livestatus.o /omd/sites/$SITE/lib/mk-livestatus/livestatus.o
+echo "$C files copied"
+echo "Restarting site $SITE"
+sudo omd restart $SITE nagios

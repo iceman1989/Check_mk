@@ -1,0 +1,10 @@
+Title: setup.py now handles non existing wwwuser gracefully
+Level: 1
+Component: core
+Version: 1.2.3i6
+Date: 1383213401
+Class: fix
+
+In the past, it could lead to errors when packing Check_MK
+on systems without installed apache. On those systems, the
+apache user is missing and those errors occured.

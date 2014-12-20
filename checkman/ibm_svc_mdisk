@@ -1,0 +1,26 @@
+title: IBM SVC / Storwize V3700 / V7000: Status and Mode of MDisks
+agents: ibm_svc
+catalog: hw/storagehw/ibm
+license: GPL
+distribution: check_mk
+description:
+ Checks the status and mode of MDisks in an IBM SVC / Storwize V3700 / V7000
+ device.
+
+ Status {online} is {OK}, status {offline} and {excluded} are {CRIT} and
+ every other status is {WARN}.
+
+ Modes {managed} and {array} are {OK} and every other mode is {WARN}.
+
+ The worst of both is returned as check result.
+
+ Please note: You need the Special Agent agent_ibmsvc to retrieve the monitoring
+ data from the device. Your monitoring user must be able to SSH to the device
+ with SSH Key Authentification. Please exchange SSH key. The Special Agent itself
+ can be configured by WATO.
+
+item:
+ The name of the MDisk.
+
+inventory:
+ Creates one check for every MDisk in th IBM SVC / Storwize V3700 / V7000 device.

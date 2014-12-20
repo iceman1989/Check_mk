@@ -1,0 +1,15 @@
+title: DOCSIS: Downstream Channels
+agents: snmp
+catalog: hw/network/generic
+license: GPL
+distribution:
+description:
+ This check monitors the frequency for each channel in Mhz and the the current operational transmit power. Levels for each value can be set.
+ Additional information are available but not implemented yet.
+
+item:
+ Channel ID
+
+inventory:
+ One service will be created for each channel
+

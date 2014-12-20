@@ -1,0 +1,8 @@
+Title: Fixed exception on displaying WATO helptexts in the global settings
+Level: 1
+Component: wato
+Version: 1.2.3i7
+Date: 1384860471
+Class: fix
+
+The helptext of each valuespec was not properly converted from unicode to utf-8

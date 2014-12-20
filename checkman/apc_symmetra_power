@@ -1,0 +1,31 @@
+title: APC Symmetra UPS: Output power
+agents: snmp
+catalog: hw/power/apc
+license: GPL
+distribution: check_mk
+description:
+ This check monitors the output power (in Watt) of the
+ (usually three) phases of an APC Symmetra power supply.
+ You can define warning and critical levels of power, below which
+ the phases must not drop.
+
+item:
+ The index of the phase, e.g. {"1"}.
+
+examples:
+ # Trigger warning/critical level if power drops below 100 or 20 Watt
+ apc_power_default_levels = (100, 20)
+
+perfdata:
+ The current output power int Watt
+
+inventory:
+ Supported.
+
+[parameters]
+warn (int): The warning level: the power should not drop at or below this level
+crit (int): The critical level: the power must not drop at or below this level
+
+[configuration]
+apc_power_default_levels (int, int): The default levels to be used
+   for inventorized checks. This variable is preset to {(20, 1)}

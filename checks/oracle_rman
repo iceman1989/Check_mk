@@ -1,0 +1,73 @@
+#!/usr/bin/python
+# -*- encoding: utf-8; py-indent-offset: 4 -*-
+# +------------------------------------------------------------------+
+# |             ____ _               _        __  __ _  __           |
+# |            / ___| |__   ___  ___| | __   |  \/  | |/ /           |
+# |           | |   | '_ \ / _ \/ __| |/ /   | |\/| | ' /            |
+# |           | |___| | | |  __/ (__|   <    | |  | | . \            |
+# |            \____|_| |_|\___|\___|_|\_\___|_|  |_|_|\_\           |
+# |                                                                  |
+# | Copyright Mathias Kettner 2014             mk@mathias-kettner.de |
+# +------------------------------------------------------------------+
+#
+# This file is part of Check_MK.
+# The official homepage is at http://mathias-kettner.de/check_mk.
+#
+# check_mk is free software;  you can redistribute it and/or modify it
+# under the  terms of the  GNU General Public License  as published by
+# the Free Software Foundation in version 2.  check_mk is  distributed
+# in the hope that it will be useful, but WITHOUT ANY WARRANTY;  with-
+# out even the implied warranty of  MERCHANTABILITY  or  FITNESS FOR A
+# PARTICULAR PURPOSE. See the  GNU General Public License for more de-
+# ails.  You should have  received  a copy of the  GNU  General Public
+# License along with GNU Make; see the file  COPYING.  If  not,  write
+# to the Free Software Foundation, Inc., 51 Franklin St,  Fifth Floor,
+# Boston, MA 02110-1301 USA.
+
+# <<<oracle_rman>>>
+# TUX2 COMPLETED 2014-07-08_17:27:59 2014-07-08_17:29:35 DB_INCR 32
+# TUX2 COMPLETED 2014-07-08_17:30:02 2014-07-08_17:30:06 ARCHIVELOG 121
+
+# Columns: SID STATUS START END BACKUPTYPE BACKUPAGE
+
+def inventory_oracle_rman(info):
+    return [ (line[0] + "." + line[4], {}) for line in info
+            # only check full, incremental and archivelog-Backups
+            if line[4] in ('ARCHIVELOG', 'DB_FULL', 'DB_INCR')]
+
+
+def check_oracle_rman(item, params, info):
+    for sid, status, start, end, backuptype, backupage in info:
+        if item == sid + "." + backuptype:
+            if not backupage:
+                return 0, "Backup is currently running"
+            backupage = int(backupage)
+            infotext = "Last backup %s ago" % get_age_human_readable(backupage * 60)
+
+            state = 0
+            if "levels" in params:
+                warn, crit = params.get("levels")
+                if backupage >= crit:
+                    state = 2
+                elif backupage >= warn:
+                    state = 1
+                infotext += " (levels at %s/%s)" % (
+                    get_age_human_readable(warn),
+                    get_age_human_readable(crit))
+
+            perfdata = [ ("age", backupage, ) ]
+
+            return state, infotext, perfdata
+
+    # In case of missing information we assume that the login into
+    # the database has failed and we simply skip this check. It won't
+    # switch to UNKNOWN, but will get stale.
+    raise MKCounterWrapped("Login into database failed")
+
+check_info['oracle_rman'] = {
+    "check_function"          : check_oracle_rman,
+    "inventory_function"      : inventory_oracle_rman,
+    "service_description"     : "ORA %s RMAN Backup",
+    "has_perfdata"            : True,
+    "group"                   : "oracle_rman",
+}

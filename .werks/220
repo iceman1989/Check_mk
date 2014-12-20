@@ -1,0 +1,10 @@
+Title: Added HTML escaping to several global settings attributes
+Level: 1
+Component: wato
+Version: 1.2.3i7
+Date: 1384955251
+Class: fix
+
+This fixes problems when display settings the contain characters
+like <tt>&lt;</tt> and <tt>&gt;</tt>. One example is the setting
+for the email command, which might contain strings like <tt>-r '<Hirni Baldi> hirni@baldi'</tt>.

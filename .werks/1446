@@ -1,0 +1,12 @@
+Title: cisco_temp_perf: Check now finds missing sensors in case where also cisco_temp_sensor is being used.
+Level: 1
+Component: checks
+Compatible: compat
+Version: 1.2.6b1
+Date: 1415142000
+Class: fix
+
+<tt>cisco_temp_perf</tt> previously didn't inventorize on hosts where <tt>cisco_temp_sensor</tt>
+was being used. This has been changed to find sensors that were previously
+missing, but might lead to some sensors appearing twice in some cases.
+

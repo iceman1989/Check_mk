@@ -1,0 +1,46 @@
+title: MRPE: MK's Remote Plugin Executor
+agents: linux, aix, solaris, hpux, macosx, netbsd, openbsd, freebsd
+catalog: generic
+license: GPL
+distribution: check_mk
+description:
+ The MRPE is a simple and efficient way to use standard Nagios
+ Plugins with the {check_mk_agent} and thus emulate NRPE to
+ a certain degree. Its main usage is to allow a soft migration
+ from NRPE to check_mk and to use third party Nagios plugins
+ that are running locally on your target hosts.
+
+ This check type processes the MRPE section in the output of the
+ agent. Since
+ all levels and parameters are configured on the target host,
+ no parameters are needed here. Please refer to the online
+ documentation on how to configure the agent.
+
+ The current version of the {mrpe} check is now cluster-aware
+ and works well as a {clustered_service} (see article about
+ Check_MK cluster monitoring). If an MRPE check is found on
+ more than one node, then the best status of the checks is
+ being used. So if the check is critical on one of the nodes
+ and OK on another then the status, output and performance
+ data of the OK check is being used as the gross result of the check.
+
+item:
+ The service description of the check as configured in {mrpe.cfg}
+ on the target host.
+
+perfdata:
+ All performance data is transparently
+ transported via check_mk to Nagios. If you are using PNP4Nagios, you
+ can set {perfdata_format = "pnp"} in your {main.mk}. This will let
+ PNP4Nagios choose a template matching the original check command.
+
+ Note: from version 1.1.9i2 on {"pnp"} is the default setting. You
+ can change it back by setting {perfdata_format} to {"standard"}.
+
+inventory:
+ All plugins configured in {mrpe.cfg} are automatically inventorized.
+
+[configuration]
+perfdata_format (string): Set to {"pnp"} for adding the check command
+ for PNP4Nagios. Set to {"standard"} for omitting template information
+ and better comply with the Nagios standard.

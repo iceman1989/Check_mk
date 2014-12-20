@@ -1,0 +1,11 @@
+Title: EC actions are now saved when an EC rule has "Send monitoring notification" set
+Level: 1
+Component: ec
+Compatible: compat
+Version: 1.2.5i6
+Date: 1412933594
+Class: fix
+
+This fixes a bug where actions where not saved.  This lead to the warning
+<i>You are missing the action with the ID @NOTIFY which is still used in
+some rules</i>.

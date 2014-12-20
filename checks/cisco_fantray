@@ -1,0 +1,60 @@
+#!/usr/bin/python
+# -*- encoding: utf-8; py-indent-offset: 4 -*-
+# +------------------------------------------------------------------+
+# |             ____ _               _        __  __ _  __           |
+# |            / ___| |__   ___  ___| | __   |  \/  | |/ /           |
+# |           | |   | '_ \ / _ \/ __| |/ /   | |\/| | ' /            |
+# |           | |___| | | |  __/ (__|   <    | |  | | . \            |
+# |            \____|_| |_|\___|\___|_|\_\___|_|  |_|_|\_\           |
+# |                                                                  |
+# | Copyright Mathias Kettner 2014             mk@mathias-kettner.de |
+# +------------------------------------------------------------------+
+#
+# This file is part of Check_MK.
+# The official homepage is at http://mathias-kettner.de/check_mk.
+#
+# check_mk is free software;  you can redistribute it and/or modify it
+# under the  terms of the  GNU General Public License  as published by
+# the Free Software Foundation in version 2.  check_mk is  distributed
+# in the hope that it will be useful, but WITHOUT ANY WARRANTY;  with-
+# out even the implied warranty of  MERCHANTABILITY  or  FITNESS FOR A
+# PARTICULAR PURPOSE. See the  GNU General Public License for more de-
+# ails.  You should have  received  a copy of the  GNU  General Public
+# License along with GNU Make; see the file  COPYING.  If  not,  write
+# to the Free Software Foundation, Inc., 51 Franklin St,  Fifth Floor,
+# Boston, MA 02110-1301 USA.
+
+
+cisco_fantray_state_names = {
+    '1': (3, "status is reported as 'unknown'"),
+    '2': (0, "powered on"),
+    '3': (2, "powered down"),
+    '4': (2, "partial failure, needs replacement as soon as possible.")
+}
+
+def inventory_cisco_fantray(info):
+    inventory = []
+    for fan_id, state in info:
+        if state != '3': # skip fans reported as down (might be missing)
+            inventory.append((fan_id, None))
+    return inventory
+
+def check_cisco_fantray(item, _no_params, info):
+    for fan_id, state in info:
+        if fan_id == item:
+            result, state_name = \
+                cisco_fantray_state_names.get(state, (3, "unexpected(%s)" % state))
+            return result, state_name
+
+    return (3, "No information about fan with this ID")
+
+
+check_info["cisco_fantray"] = {
+    'check_function'      : check_cisco_fantray,
+    'inventory_function'  : inventory_cisco_fantray,
+    'service_description' : 'FAN %s',
+    'snmp_info'           : ('.1.3.6.1.4.1.9.9.117.1.4.1.1.1', [ OID_END, '' ]),
+    'snmp_scan_function'  : lambda oid: "cisco" in oid(".1.3.6.1.2.1.1.1.0").lower() \
+                            # Exclude cisco_fan check:
+                            and not oid(".1.3.6.1.4.1.9.9.13.1.4.1.2.*"),
+}

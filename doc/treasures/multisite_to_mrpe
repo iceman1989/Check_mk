@@ -1,0 +1,197 @@
+#!/usr/bin/python
+# encoding: utf-8
+
+# Fetches the current state of all services of a host via Multisite and
+# outputs an <<<mrpe>>> section reflecting these states. This script is
+# intended to be used as a datasource program.
+# 
+# Why? This allows you to "import" monitoring data from another
+# Check_MK system via HTTP without having livestatus access. The
+# administrator of the remote system has full control over this
+# channel and can also select a subset of hosts/services to export
+# by simply using standard contact <-> object relation for that
+# user.
+#
+# How to setup:
+# 1. On the remote system create a user for the export and
+#    set its authentication method to 'Automation'. In this
+#    step a secret is being created.
+# 2. In your local monitoring system create one host for
+#    each remote host that you want to import (sorry, this
+#    has really to be done manually)
+# 3. Configure this script as a datasource program for those
+#    hosts. Call me with --help for details.
+# 4. Do Inventory and activate your configuration
+#
+# Note: Whenever the list of services of an imported host
+# changes on the remote system you have to do a re-inventory
+# of that host. 
+# 
+# Here is an example for a datasource_programs-definition (assuming
+# that the user is "automation"):
+# "$OMD_ROOT/local/lib/multisite_to_mrpe --secret dasistgeheim --url http://localhost/remote/check_mk/ <HOST>"
+# 
+
+import os, sys, getopt, time, urllib, subprocess
+
+omd_site = os.getenv("OMD_SITE")
+omd_root = os.getenv("OMD_ROOT")
+
+def convert_from_multisite(response):
+    headers = response[0]
+    return [ dict(zip(headers, line)) for line in response[1:] ]
+
+def bail_out(reason):
+    sys.stderr.write(reason + "\n")
+    sys.exit(1)
+
+def verbose(text):
+    if opt_verbose:
+        sys.stdout.write(text + "\n")
+
+def usage():
+    sys.stdout.write("""Usage: multisite_to_mrpe -U URL {-P PASSWORD|-S SECRET} [OPTIONS] HOST
+
+This program is intended to be used as a datasource program.
+It fetches the current state of all services of a host
+from a remote Multisite and create a <<<mrpe>>> section
+from it. That way all those services can be added to the
+monitoring of another OMD site.
+
+URL is the
+/check_mk/ e.g.  http://someserver.abc/prod/check_mk/
+
+Options:
+  -h, --help          Show this help and exit
+  -v, --verbose       Show what's going on
+  -u, --user U        Name of automation user (default: "automation")
+  -U, --url U         Multisite URL of the remote server including
+  -S, --secret S      Automation secret (default: public)
+  -P, --password P    Use HTTP password P (when using BasicAuth, no Cookies)
+      --debug         Let Python exceptions come through
+
+""")
+
+
+short_options = 'hvu:U:S:P:'
+long_options = [ "help", "verbose", "user=", "url=", "secret=", "debug", "password=" ]
+
+opt_verbose = False
+opt_user = "automation"
+opt_secret = None
+opt_password = None
+opt_url = None
+opt_debug = False
+
+if omd_site:
+    opt_url = "http://localhost/" + omd_site + "/check_mk/"
+
+try:
+    opts, args = getopt.getopt(sys.argv[1:], short_options, long_options)
+except getopt.GetoptError, err:
+    sys.stderr.write("%s\n\n" % err)
+    usage()
+    sys.exit(1)
+
+for o,a in opts:
+    # Docu modes
+    if o in [ '-h', '--help' ]:
+        usage()
+        sys.exit(0)
+
+    # Modifiers
+    elif o in [ '-v', '--verbose']:
+        opt_verbose = True
+    elif o == '--debug':
+        opt_debug = True
+    elif o in [ '-u', '--user']:
+        opt_user = a
+    elif o in [ '-S', '--secret']:
+        opt_secret = a
+    elif o in [ '-P', '--password']:
+        opt_password = a
+    elif o in [ '-U', '--url']:
+        opt_url = a
+
+if not opt_secret and not opt_password:
+    bail_out("You must specify either -P or -S.")
+
+if not opt_url:
+    bail_out("Please specify the URL to Check_MK Multisite with -U.")
+
+if not opt_url.endswith("/check_mk/"):
+    bail_out("The automation URL must end with /check_mk/")
+
+if not args:
+    bail_out("Please specify the host to query services for")
+
+arg_host = args[0]
+
+verbose("Host:             " + arg_host)
+verbose("Multisite-URL:    " + opt_url)
+verbose("User:             " + opt_user)
+if opt_secret:
+    verbose("Authentication:   Cookies")
+    verbose("Secret:           " + opt_secret)
+else:
+    verbose("Authentication:   HTTP BasicAuth")
+    verbose("Password:         " + opt_password)
+
+
+def make_url(base, variables):
+    return base + "?" + urllib.urlencode(variables)
+
+variables = [
+    ( "host",           arg_host ),
+    ( "view_name",      "host_export" ),
+    ( "output_format",  "python" ),
+]
+
+if opt_secret:
+    variables += [
+       ( "_username",      opt_user ),
+       ( "_secret", opt_secret )
+   ]
+
+url = make_url(opt_url + "view.py", variables)
+verbose("URL:              " + url)
+
+try:
+    arguments = [ 'curl', '--silent', '--insecure', ]
+    if opt_password: 
+        arguments.append('--user')
+        arguments.append("%s:%s" % (opt_user, opt_password))
+    else:
+        arguments.append(opt_user)
+    arguments.append(url)
+    verbose("Calling:          " + " ".join(arguments))
+
+
+    process = subprocess.Popen(arguments, executable='curl', stdout=subprocess.PIPE)
+    answer, stderrdata = process.communicate()
+    result = process.wait()
+    print result
+    if answer.startswith("ERROR:"):
+        bail_out("Error response from remote Multisite: %s" % answer[7:])
+    try:
+        parsed = eval(answer)
+    except:
+        bail_out("Invalid response from Multisite: %s\n" % answer)
+
+    services = convert_from_multisite(eval(answer))
+except Exception, e:
+    if opt_debug:
+        raise
+    bail_out("Cannot call Multisite URL: %s" % e)
+
+sys.stdout.write('<<<mrpe>>>\n')
+
+for service in services:
+    state = { "OK" : 0, "WARN" : 1, "CRIT" : 2, "UNKNOWN" : 3}.get(service['service_state'])
+    if state != None: # skip pending services
+        sys.stdout.write("(%s) %s %d %s|%s\n" % (
+            service["svc_check_command"].replace(" ", "_"),
+            service["service_description"].replace(" ", "_"),
+            state, 
+            service["svc_plugin_output"],
+            service["svc_perf_data"]))

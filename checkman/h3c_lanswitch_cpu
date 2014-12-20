@@ -1,0 +1,42 @@
+title: 3COM and H3C switches: CPU utilization
+agents: snmp
+catalog: hw/network/h3c
+license: GPL
+distribution: check_mk
+description:
+ This Check queries the CPU utilization of various LAN switches that are
+ supporting the MIB for H3C lan switches.  These are: newer 3COM switches
+ (Superstack 4 and later), H3C branded switches and now for example the HP
+ "A-Series" Networking gear. The same switches from the original maker Huawei
+ are {not} supporting the MIB.  The check tries to correctly label the CPU in
+ your switch / stack / core switch module slots.
+
+ The check goes WARN/CRIT if the average CPU usage of the last {five minutes}
+ exceeds configurable levels.
+
+ Note that some of these switches don't handle SNMP well and might generate
+ up to 90% cpu load while queried.  To accomodate for this you should lower
+ the frequency of SNMP based checks with them.
+
+ Some devices have a high usage even in normal conditions (i.e. running full
+ BGP tables). In that case you might have to fine tune the check parameters
+ or even have to disable the check.
+
+inventory:
+ The check will create one separate service per CPU.
+
+item:
+ A string describing the switch and unit number, for example {"Switch 2 CPU 0"}
+ or {"Switch 1 Slot 11"}.
+
+perfdata:
+ One value: the 5 minute average CPU usage in percent (from 0 to 100).
+
+[parameters]
+warning (int): the percentage of 5-minute average usage at which the check returns WARN.
+critical (int): the percentage of 5-minute average usage at which the check goes critical.
+
+[configuration]
+switch_cpu_default_levels (int, int): the default warn and critical levels.
+ They are preset to {(50,75)} (meaning 50% for WARN and 75% for CRIT).
+

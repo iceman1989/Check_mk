@@ -1,0 +1,31 @@
+title: Generic Printer: Alerts reported
+agents: snmp
+catalog: hw/printer
+license: GPL
+distribution: check_mk
+description:
+
+ This check monitors the alerts reported by printers supporting the
+ {PRINTER-MIB}. The check generates one service per device.  For every
+ active printer alert group ({prtAlertGroup}) it determines the alert code
+ ({prtAlertCode}) and displays a textual representation of the alert code.
+ If available on the device, it also displays a description of the alert.
+
+ The state of the check is determined from a table defining the relation between
+ the alert code and the state of the check. This table is hardcoded. If you find
+ any possible improvements or shortcomings of the table, feel free to contact us.
+
+inventory:
+ One check is being created for each device.
+
+examples:
+ # Make 'Energiesparen' an OK state
+ printer_alerts_text_map = {
+     'Energiesparen' : 0,
+ }
+
+[configuration]
+printer_alerts_text_map(dict): Some printers send a status code of {-1} in some cases.
+ But you can use the additional descriptive text sent by the printer for assigning
+ a monitoring state by using this dictionary. The key is the descriptive text. The
+ value is 0 (OK), 1 (WARN), 2 (CRIT) or 3 (UNKNOWN).

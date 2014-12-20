@@ -1,0 +1,47 @@
+title: Brocade NetIron MLX devices: NI-MLX or BR-MLX Module Memory (RAM usage)
+agents: snmp
+catalog: hw/network/brocade
+license: GPL
+distribution: check_mk
+description:
+ Checks the Module Memory (RAM usage) of a NI-MLX or BR-MLX module in Brocade
+ NetIron MLX switching / routing devices.
+
+ {WARN} or {CRIT} is returned, if the usage is above given thresholds.
+ {OK} is returned otherwise.
+
+item:
+ If a module description is delivered by SNMP, the item is build from the
+ module ID plus the description. Otherwise it is just the ID.
+
+examples:
+ # set default levels to 70 and 80 percent:
+ brocade_mlx_mem_default_levels = { "levels": (70.0, 80.0) }
+
+ # Check Module with ID 33 on a box called my-mlx-device with default levels
+ checks += [
+   ("my-mlx-device", "brocade_mlx.module_mem", '33 NI-MLX-32_MR Management', brocade_mlx_mem_default_levels),
+ ]
+
+ # or use individual levels for warn and crit
+ checks += [
+   ("my-mlx-device", "brocade_mlx.module_mem", '33 NI-MLX-32_MR Management', { "levels": (75.0, 85.0) }),
+ ]
+
+perfdata:
+ one value is returned: The amount of memory used (in Bytes),
+ together with warn and crit levels and maximum value
+
+inventory:
+ Finds one item per NI-MLX or BR-MLX module.
+ Modules with state "empty" or "Blocked for full height card" are omitted.
+
+[parameters]
+parameters (dict): with the element
+{"levels"}: (int or float, int or float): Levels of memory usage for {WARN} and {CRIT}.
+  If a value is given as float, it is interpreted as percentage.
+  If a value is given as int, it is interpreted as an absolute value in megabytes.
+
+[configuration]
+brocade_mlx_mem_default_levels(dict): The standard levels for {WARN} and
+    {CRIT}, preset to { "levels": (80.0, 90.0) }

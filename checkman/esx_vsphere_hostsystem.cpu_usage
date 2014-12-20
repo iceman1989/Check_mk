@@ -1,0 +1,31 @@
+title: VMWare ESX host systems: CPU utilization
+agents: vsphere
+catalog: os/kernel
+license: GPL
+distribution: check_mk
+description:
+ This check measures the CPU utilization of an VMWare ESX Host System.
+ It also shows you the number of sockets, cores and threads.
+
+perfdata:
+  One or two values: the first value is current usage in percent - ranging from
+  0 to 100. The "maximum" value is not 100, but the number of CPU threads. This
+  case be used for scaling the graph in terms of the number of used CPU threads.
+
+  If averaging is enabled then a second value is sent: the averaged CPU utilization
+  ranging from 0 to 100.
+
+inventory:
+  One check per ESX Host System will be created.
+
+[parameters]
+parameters(dict): A dictionary with the following keys:
+
+  {"levels"}: Either {None} for no levels, a tuple of warn and crit (in percent) or
+  a dictionary with predictive levels settings.
+
+  {"average"}: A number of minutes for enabling averaging.
+
+[configuration]
+esx_host_cpu_default_levels(dict): Default levels, preset to an empty dictionary, which means that no levels
+  will be applied.

@@ -1,0 +1,11 @@
+Title: Fixed "Inventory failed" message when trying an inventory on clusters via WATO
+Level: 2
+Component: wato
+Version: 1.2.5i1
+Date: 1386758273
+Class: fix
+
+The service inventory of cluster hosts via WATO failed all the time with an error message
+like "Inventory failed for this host: Error - host is unreachable, no usable cache file present".
+This error has been fixed with this change.
+A WATO-inventory on a cluster node also no longer removes previously detected clustered services.

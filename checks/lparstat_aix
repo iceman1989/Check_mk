@@ -1,0 +1,111 @@
+#!/usr/bin/python
+# -*- encoding: utf-8; py-indent-offset: 4 -*-
+# +------------------------------------------------------------------+
+# |             ____ _               _        __  __ _  __           |
+# |            / ___| |__   ___  ___| | __   |  \/  | |/ /           |
+# |           | |   | '_ \ / _ \/ __| |/ /   | |\/| | ' /            |
+# |           | |___| | | |  __/ (__|   <    | |  | | . \            |
+# |            \____|_| |_|\___|\___|_|\_\___|_|  |_|_|\_\           |
+# |                                                                  |
+# | Copyright Mathias Kettner 2014             mk@mathias-kettner.de |
+# +------------------------------------------------------------------+
+#
+# This file is part of Check_MK.
+# The official homepage is at http://mathias-kettner.de/check_mk.
+#
+# check_mk is free software;  you can redistribute it and/or modify it
+# under the  terms of the  GNU General Public License  as published by
+# the Free Software Foundation in version 2.  check_mk is  distributed
+# in the hope that it will be useful, but WITHOUT ANY WARRANTY;  with-
+# out even the implied warranty of  MERCHANTABILITY  or  FITNESS FOR A
+# PARTICULAR PURPOSE. See the  GNU General Public License for more de-
+# ails.  You should have  received  a copy of the  GNU  General Public
+# License along with GNU Make; see the file  COPYING.  If  not,  write
+# to the Free Software Foundation, Inc., 51 Franklin St,  Fifth Floor,
+# Boston, MA 02110-1301 USA.
+
+# +------------------------------------------------------------------+
+# | This file has been contributed and is copyrighted by:            |
+# |                                                                  |
+# | Joerg Linge 2009 <joerg.linge@pnp4nagios.org>     Copyright 2010 |
+# +------------------------------------------------------------------+
+
+#       %user  %sys  %wait  %idle physc %entc  lbusy   app  vcsw phint
+#       -----  ----  -----  ----- ----- ----- ------   ---  ---- -----
+#         2.5   6.0    0.1   91.5  0.03  11.4    1.8  3.27 1976647217 490545630
+
+
+lparstat_default_levels = (5, 10)
+
+def inventory_lparstat(info):
+    if len(info) == 1 and len(info[0]) >= 5:
+        return [(None, "", "lparstat_default_levels")]
+
+def check_lparstat(item, params, info):
+    line = info[0]
+    if len(line) == 10:
+        cols   = [ 'physc', 'entc', 'lbusy', 'app', 'vcsw', 'phint' ]
+        uom    = [ '',      '%',    '',      '',    '',     '' ]
+        values = line[-6:]
+    elif len(line) == 9:
+        cols   = [ 'physc', 'entc', 'lbusy', 'app' ]
+        uom    = [ '',      '%',    '',      '' ]
+        values = line[-4:]
+    elif len(line) == 6:
+        cols   = [ 'nsp', 'utcyc' ]
+        uom    = [ '%',   '%' ]
+        values = line[-2:]
+    else:
+        return 3, "Invalid output from agent"
+
+    perfdata = [ (cols[i], val+uom[i]) for i, val in enumerate(values) ]
+    output   = ', '.join([ cols[i].title()+': '+val+uom[i] for i, val in enumerate(values) ])
+    return 0, output, perfdata
+
+check_info["lparstat_aix"] = {
+    'check_function':          check_lparstat,
+    'inventory_function':      inventory_lparstat,
+    'service_description':     'lparstat',
+    'has_perfdata':            True,
+}
+
+# Utilization and IO/Wait
+kernel_util_default_levels = None
+
+def inventory_lparstat_aix_cpu(info):
+    if len(info) == 1 and len(info[0]) >= 4:
+        return [(None, "kernel_util_default_levels")]
+
+def check_lparstat_aix_cpu(_no_item, params, info):
+    user, system, wait, idle = map(float, info[0][:4])
+    perfdata = [
+          ( "user",   "%.3f" % user ),
+          ( "system", "%.3f" % system ),
+          ( "wait",   "%.3f" % wait ) ]
+
+    infotext = "user: %2.1f%%, system: %2.1f%%, wait: %2.1f%%" % (user, system, wait)
+
+    # You may set a warning/critical level on the io wait
+    # percentage. This can be done by setting params to
+    # a pair of (warn, crit)
+    result = 0
+    try:
+        warn, crit = params
+        if wait >= crit:
+            result = 2
+            infotext += "(!!)"
+        elif wait >= warn:
+            result = 1
+            infotext += "(!)"
+    except:
+        pass
+
+    return (result, infotext, perfdata)
+
+check_info['lparstat_aix.cpu_util'] = {
+    "check_function"         : check_lparstat_aix_cpu,
+    "inventory_function"     : inventory_lparstat_aix_cpu,
+    "service_description"    : "CPU utilization",
+    "has_perfdata"           : True,
+    "group"                  : "cpu_iowait",
+}

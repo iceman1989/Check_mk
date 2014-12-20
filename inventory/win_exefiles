@@ -1,0 +1,59 @@
+#!/usr/bin/python
+# -*- encoding: utf-8; py-indent-offset: 4 -*-
+# +------------------------------------------------------------------+
+# |             ____ _               _        __  __ _  __           |
+# |            / ___| |__   ___  ___| | __   |  \/  | |/ /           |
+# |           | |   | '_ \ / _ \/ __| |/ /   | |\/| | ' /            |
+# |           | |___| | | |  __/ (__|   <    | |  | | . \            |
+# |            \____|_| |_|\___|\___|_|\_\___|_|  |_|_|\_\           |
+# |                                                                  |
+# | Copyright Mathias Kettner 2013             mk@mathias-kettner.de |
+# +------------------------------------------------------------------+
+#
+# This file is part of Check_MK.
+# The official homepage is at http://mathias-kettner.de/check_mk.
+#
+# check_mk is free software;  you can redistribute it and/or modify it
+# under the  terms of the  GNU General Public License  as published by
+# the Free Software Foundation in version 2.  check_mk is  distributed
+# in the hope that it will be useful, but WITHOUT ANY WARRANTY;  with-
+# out even the implied warranty of  MERCHANTABILITY  or  FITNESS FOR A
+# PARTICULAR PURPOSE. See the  GNU General Public License for more de-
+# ails.  You should have  received  a copy of the  GNU  General Public
+# License along with GNU Make; see the file  COPYING.  If  not,  write
+# to the Free Software Foundation, Inc., 51 Franklin St,  Fifth Floor,
+# Boston, MA 02110-1301 USA.
+
+# Example output
+# <<<win_exefiles:sep(124)>>>
+# C:\Program Files\Common Files\Microsoft Shared\MSInfo\msinfo32.exe|378880
+# C:\Program Files\Common Files\Microsoft Shared\OFFICE15\CMigrate.exe|6847704
+# C:\Program Files\Common Files\Microsoft Shared\OFFICE15\MSOXMLED.EXE|217200
+# C:\Program Files\Common Files\Microsoft Shared\OfficeSoftwareProtectionPlatform\OSPPSVC.EXE|5132888
+
+def inv_win_exefiles(info):
+    paclist = inv_tree("software.packages:")
+    for full_name, write_time, size, description, product_version, product_name in info:
+        parts = full_name.split('\\')
+        # 14.02.2014 23:12:04
+        if re.match("^\d{2}\.\d{2}\.20\d{2} \d{2}:\d{2}:\d{2}", write_time):
+            install_date = int(time.mktime(time.strptime(write_time, "%d.%m.%Y %H:%M:%S")))
+        else:
+            install_date = write_time
+
+        entry = {
+            "name"            : parts[-1],
+            "path"            : "\\".join(parts[:-1]),
+            "package_type"    : "exe",
+            "install_date"    : install_date,
+            "size"            : saveint(size),
+            "version"         : product_version,
+            "summary"         : description,
+            "vendor"          : product_name,
+        }
+        paclist.append(entry)
+
+
+inv_info['win_exefiles'] = {
+   "inv_function"           : inv_win_exefiles,
+}

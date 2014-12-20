@@ -1,0 +1,14 @@
+Title: f5_bigip_interfaces: Fix invalid throughput values, detect newer F5 devices
+Level: 1
+Component: checks
+Compatible: compat
+Version: 1.2.5i6
+Date: 1409238534
+Class: fix
+
+A major indentation error has lead to interface throuputs identical for all IFs.
+The oid for the determination of the if state was wrong.
+
+Both errors have been fixed.
+Also the scan function was extended to detect more and newer f5 devices
+

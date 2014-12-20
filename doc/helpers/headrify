@@ -1,0 +1,148 @@
+#!/bin/bash
+VERSION=$(sed -rn 's/^VERSION[[:space:]]*= *([0-9]+\.[0-9]+\.[0-9a-z]+).*/\1/p' < Makefile)
+
+# figlet -f small macht einen kleinen Font
+header ()
+{
+    echo '+------------------------------------------------------------------+'
+
+    figlet -w 66 -c "Check_MK" | tr ' ' @  | sed '$d' | \
+	while read -r line
+      do
+      printf "|%-66s|\n" "${line//@/ }"
+    done
+    echo '|                                                                  |'
+    echo '| Copyright Mathias Kettner 2014             mk@mathias-kettner.de |'
+    echo '+------------------------------------------------------------------+'
+
+    cat <<EOF
+
+This file is part of Check_MK.
+The official homepage is at http://mathias-kettner.de/check_mk.
+
+check_mk is free software;  you can redistribute it and/or modify it
+under the  terms of the  GNU General Public License  as published by
+the Free Software Foundation in version 2.  check_mk is  distributed
+in the hope that it will be useful, but WITHOUT ANY WARRANTY;  with-
+out even the implied warranty of  MERCHANTABILITY  or  FITNESS FOR A
+PARTICULAR PURPOSE. See the  GNU General Public License for more de-
+ails.  You should have  received  a copy of the  GNU  General Public
+License along with GNU Make; see the file  COPYING.  If  not,  write
+to the Free Software Foundation, Inc., 51 Franklin St,  Fifth Floor,
+Boston, MA 02110-1301 USA.
+EOF
+  if [ -n "$lastline" ] ; then
+      echo
+      echo "$lastline"
+  fi
+}
+
+headrify ()
+{
+  if [ ! -f "$file" ] ; then
+      echo "Skipping $file. It's not a file."
+      return
+  fi
+
+  if [ "${file##*/}" = README ] ; then
+      echo "skipping README file."
+      return
+  fi
+
+  echo "$file..."
+  PERMISSIONS=$(stat -c %a "$file")
+  TMP=$(mktemp .headrify.new.XXXXXX)
+  suffix="${file##*.}"
+  suffix="${suffix##*/}"
+  headline="$(head -n1 $file)"
+  if [ "${headline:0:9}" = "#!/bin/sh" ] ; then
+      comment="# "
+      bangpath="#!/bin/sh"
+  elif [ "${headline:0:16}" = "#!/usr/bin/ksh93" ] ; then
+      comment="# "
+      bangpath="#!/usr/bin/ksh93"
+  elif [ "${headline:0:14}" = "#!/usr/bin/ksh" ] ; then
+      comment="# "
+      bangpath="#!/usr/bin/ksh"
+  elif [ "${headline:0:11}" = "#!/bin/bash" ] ; then
+      comment="# "
+      bangpath="#!/bin/bash"
+  elif [ "${headline:0:15}" = "#!/usr/bin/bash" ] ; then
+      comment="# "
+      bangpath="#!/usr/bin/bash"
+  elif [ "${headline:0:14}" = "#!/usr/bin/php" ] ; then
+      comment="# "
+      bangpath="#!/usr/bin/pnp"
+  else
+      bangpath=""
+      case "${file##*/}" in
+          *.openvms) comment='$!# ' ;;
+          *.php)    comment="# " ; bangpath="<?php"; ;;
+          *.css)    comment="" ;  bangpath="/*"; lastline="*/" ;;
+          *.h|*.c|*.cc|*.h.in|*.js) comment="// " ;;
+          *.conf|*.cfg)   comment="# " ;;
+          *.spec|Makefile*) comment="# " ;;
+          *.py|*)     comment="# "  ; bangpath="#!/usr/bin/python
+# -*- encoding: utf-8; py-indent-offset: 4 -*-"; ;;
+      esac
+  fi
+
+  : > $TMP
+  if [ -n "$bangpath" ] ; then echo "$bangpath" > $TMP ; fi
+  header | sed "s@^@$comment@" | sed 's/ *$//' >> $TMP
+  echo >> $TMP
+  firstline="$(head -n1 < $file)"
+  secondline="$(sed -n 2p < $file)"
+  thirdline="$(sed -n 3p < $file)"
+  shouldbe="$comment+---------------------------------------------------"
+  endline='.*Boston, MA 02110-1301 USA.'
+
+  if [ -n "$lastline" ] ; then endline="${lastline//\//\/}" ; fi
+  if [ "${firstline:0:20}" = "${shouldbe:0:20}"  \
+       -o "${secondline:0:20}" = "${shouldbe:0:20}" \
+       -o "${thirdline:0:20}" = "${shouldbe:0:20}" ] ; then
+      sed '0,/^'"$endline"'$/d' $file | sed 1d >> $TMP
+  else
+      cat $file >> $TMP
+  fi
+  mv $TMP $file || rm -f $TMP
+  chmod $PERMISSIONS "$file"
+}
+
+echo "Headrifying to version $VERSION"
+
+if [ "$#" -gt 0 ] ; then
+  for file in "$@"
+  do
+    headrify "$file"
+  done
+else
+  { find -not -type l -and \
+      -not -name "jquery*" \
+      -not -name "*.rc" \
+      -not -name "*.rc.in" \
+      -not -name "ltmain.sh" \
+      -not -name "*.exe" \
+      -and \( \
+      -name "Makefile" -or \
+      -name "*.cfg" -or \
+      -name "Makefile.am" -or \
+      -name "configure.ac" -or \
+      -name "*.in" -or \
+      -name "*.h" -or \
+      -name "*.cc" -or \
+      -name "*.c" -or \
+      -name "*.js" -or \
+      -name "*.py" -or \
+      -name "*.php" -or \
+      -name "*.sh" -or \
+      -name "*.spec" \) ; \
+    rm -f checks/*~ ; ls checks/* ; echo agents/plugins/* agents/special/* agents/* | tr ' ' \\n | grep -vx agents/waitmax | fgrep -v windows | fgrep -v .exe | fgrep -v windows/plugins ; ls agents/windows/*.cc ; echo agents/windows/Makefile ; } \
+	| egrep -v 'livestatus/nagios4?/' | grep -vx '' | \
+  while read file
+  do
+    headrify "$file" &
+  done
+fi
+sleep 0.1
+wait

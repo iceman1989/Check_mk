@@ -1,0 +1,83 @@
+#!/usr/bin/python
+# -*- encoding: utf-8; py-indent-offset: 4 -*-
+# +------------------------------------------------------------------+
+# |             ____ _               _        __  __ _  __           |
+# |            / ___| |__   ___  ___| | __   |  \/  | |/ /           |
+# |           | |   | '_ \ / _ \/ __| |/ /   | |\/| | ' /            |
+# |           | |___| | | |  __/ (__|   <    | |  | | . \            |
+# |            \____|_| |_|\___|\___|_|\_\___|_|  |_|_|\_\           |
+# |                                                                  |
+# | Copyright Mathias Kettner 2014             mk@mathias-kettner.de |
+# +------------------------------------------------------------------+
+#
+# This file is part of Check_MK.
+# The official homepage is at http://mathias-kettner.de/check_mk.
+#
+# check_mk is free software;  you can redistribute it and/or modify it
+# under the  terms of the  GNU General Public License  as published by
+# the Free Software Foundation in version 2.  check_mk is  distributed
+# in the hope that it will be useful, but WITHOUT ANY WARRANTY;  with-
+# out even the implied warranty of  MERCHANTABILITY  or  FITNESS FOR A
+# PARTICULAR PURPOSE. See the  GNU General Public License for more de-
+# ails.  You should have  received  a copy of the  GNU  General Public
+# License along with GNU Make; see the file  COPYING.  If  not,  write
+# to the Free Software Foundation, Inc., 51 Franklin St,  Fifth Floor,
+# Boston, MA 02110-1301 USA.
+
+def inventory_dell_om_mem(info):
+    return [ (x[0], None) for x in info ]
+
+# DellMemoryDeviceFailureModes                    ::= INTEGER {
+#     -- Note: These values are bit masks, so combination values are possible.
+#     -- If value is 0 (zero), memory device has no faults.
+#     eccSingleBitCorrectionWarningRate(1),       -- ECC single bit correction warning rate exceeded
+#     eccSingleBitCorrectionFailureRate(2),       -- ECC single bit correction failure rate exceeded
+#     eccMultiBitFault(4),                        -- ECC multibit fault encountered
+#     eccSingleBitCorrectionLoggingDisabled(8),   -- ECC single bit correction logging disabled
+#     deviceDisabledBySpareActivation(16)         -- device disabled because of spare activation
+
+
+def check_dell_om_mem(item, _no_params, info):
+   failure_modes = {
+          1 : 'ECC single bit correction warning rate exceeded',
+          2 : 'ECC single bit correction failure rate exceeded',
+          4 : 'ECC multibit fault encountered',
+          8 : 'ECC single bit correction logging disabled',
+         16 : 'device disabled because of spare activation',
+    }
+
+   for location, status, size, failuremode in info:
+       if location == item:
+           status = int(status)
+           failuremode = int(failuremode)
+           if failuremode == 0:
+               yield 0, "No failure"
+           else:
+               bitmask = 1
+               while bitmask <= 16:
+                   if failuremode & bitmask != 0:
+                       if bitmask in [2, 4]:
+                           yield 2, failure_modes[bitmask]
+                       elif bitmask in [1, 8, 16]:
+                           yield 1, failure_modes[bitmask]
+                   bitmask *= 2
+
+           yield 0, "Size: %s" % get_bytes_human_readable(int(size) * 1024)
+
+
+check_info["dell_om_mem"] = {
+    "check_function"        : check_dell_om_mem,
+    "inventory_function"    : inventory_dell_om_mem,
+    "service_description"   : "Memory Module %s",
+    "has_perfdata"          : False,
+    # There is no other way to find out that openmanage is present.
+    "snmp_scan_function"    : scan_dell_om,
+    "snmp_info"             : ( ".1.3.6.1.4.1.674.10892.1.1100.50.1", [
+                                                "8.1",  # Location
+                                                "5.1",  # Status
+                                                "14.1", # Size
+                                                "20.1", # FailureMode
+                              ]),
+    "includes"              : [ "dell_om.include" ],
+}
+

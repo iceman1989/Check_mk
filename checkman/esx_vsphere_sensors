@@ -1,0 +1,25 @@
+title: VMWare ESX host systems: Hardware sensors
+agents: vsphere
+catalog: os/hardware
+license: GPL
+distribution: check_mk
+description:
+ This check checks the state of all of a VMWare ESX host system's
+ hardware sensors - including temperatures, fans, power supplies, memory DIMMS,
+ hard disk, an others. In order to avoid network traffic the agent sends
+ only information about sensors that are not in green state.
+
+inventory:
+  One check per ESX Host System will be created.
+
+examples:
+ check_parameters = [
+  ([{'states': {'2': 0, '1': 0}, 'name': 'VMware Rollup Health'}], [], ALL_HOSTS, ["Hardware Sensors"]),
+ ]
+
+[parameters]
+a list of (dict): with the following keys
+
+ {"name"}: The name of the sensor in question
+
+ {"states"}: A dictionary with with the optional keys for each sensor state and its new value

@@ -1,0 +1,8 @@
+Title: docsis_channels_upstream: New check for monitoring upstream channels on cable modems with DOCSIS MIB
+Level: 1
+Component: checks
+Version: 1.2.5i6
+Date: 1406798410
+Class: feature
+
+

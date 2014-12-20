@@ -1,0 +1,98 @@
+LIVEDUMP
+----------------
+
+livedump is a small utility that can dump configuration and status
+information from a running Nagios core in order to transport that
+data to another core - effectively replicating the data.
+
+This can be used as a very efficient replacement for NSCA.
+
+Advantages:
+- Much more performant
+- Creates your Nagios configuration for the passive services
+- No obsess_over.. configuration neccessary on the source host
+
+Disadvantages:
+- Introduces some latency
+
+How to setup livedump
+---------------------
+Copy the file livedump to a convenient place. Make sure that
+../livestatus/api/python/livestatus.py is either in the same
+directory as livedump or somewhere in the Python path.
+
+Using livedump
+--------------
+The first step is to extract the configuration from the source system using. This step
+is needed whenever your configuration of hosts or services changes.
+NSCA users will now this. This is easily done by:
+
+./livedump -TC > some_file.cfg
+
+and then copying that file to your objects or conf.d directory on
+your target nagios. Note: The option -T will add some templates
+to the configuration that are used by the created host and service
+definitions. If you import data from more than on source those
+template will be duplicate. Use -C only in that case in order to avoid
+duplication.
+
+Now restart your target system and new hosts and services will appear
+and be in pending state.
+
+Now create a cronjob that does the following every 1 or 5 minutes:
+
+1. ./livedump > ca1b2c3
+2. copy that file to the target system into the checkresults directory
+   (in OMD this is ~/tmp/nagios/checkresults)
+3. After a correct copy touch the file ca1b2c3.ok in that
+   directory
+
+Nagios will now read in that file (which is containing all current
+host and service states). The filename is arbitrary, but has to be 
+7 characters in length, starting with a "c".
+
+Filtering
+---------
+In each operation mode livedump allows to filter the number of data
+to be dumped. This is done by adding options -H and -S for host
+and service livestatus headers. The following example will only dump
+hosts and services of the host group "foo". Please make sure that 
+all hosts that are needed by the dumped services are also dumped:
+
+./livedump -H "Filter: host_groups > foo"
+
+Note: The -H headers will also be added to the service queries.
+Make sure that all columns are prefixed with host_ in these.
+
+If you are using this is in conjunction with NSCA transport and do not
+wish to transfer the templated configuration, you can use the filter 
+to only export services that have "obsess_over_service = 1" set.
+
+Encrypted Transport (E-Mail)
+----------------------------
+When you use mail to transport the output of livedump. For example with this
+command:
+
+livedump | mail -s "status" lm@mathias-kettner.de
+
+You can extend this mechanism to make the contents (not the whole message)
+be encrypted. This can be reached by different ways, we use an AES encryption
+with a preshared key here.
+
+First you need openssl on the sending site. Then you need a file which first line
+contains the preshared key which will be used to encrypt the data. Then you need
+to first send the livedump data to openssl to let it encrypt it and forward it to
+the mail command afterwards.
+
+livedump | openssl aes-256-cbc -a -kfile /path/to/my/preshared-key-file | mail -s "status" lm@mathias-kettner.de
+
+Please ensure that the permissions to the preshared key file are as limited as
+possible. Everyone who has access to an email and the key can decrypt it.
+
+This command should turn the mail contents in a block of cryptic characters when
+you take a look at the generated mail in your mail client.
+
+Now you need to configure the receiving side. We use the script "livedump-mail-fetch"
+here. To make it able to handle the encrypted message, you need to set the variable
+encrypt to hold your preshared key as string. All incoming mails will then be decrypted
+beforce being processed.

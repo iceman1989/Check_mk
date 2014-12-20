@@ -1,0 +1,34 @@
+title: CPU usage on Windows systems (deprecated)
+agents: windows
+catalog: os/kernel
+license: GPL
+distribution: check_mk
+description:
+ This check monitors the CPU usage on a Windows system using the
+ windows performance counters (agent section {winperf}).
+ In its current implementation this check is always OK.
+
+ Setting a level for warning or a critical state is possible, but might
+ not be very usefull, since the computed value is an average over just one
+ check cycle. A combination with a larger value of {max_check_attempts}
+ or {notification_delay} might be useful here.
+
+ Note: this check is deprecated and not used by modern Check_MK agents.
+ It is replaced by {winperf_processor.util}.
+
+perfdata:
+ The averaged percentage of CPU utilization during the last check cycle.
+
+inventory:
+ A check of this type is automatically created for all Windows
+ hosts.
+
+[parameters]
+warning (int): The percentage of CPU usage that triggers
+ a WARNING state
+critical (int): The percentage of CPU usage that triggers
+ a CRITICAL state
+
+[configuration]
+winperf_cpu_default_levels (int, int): Default levels warning and critical
+

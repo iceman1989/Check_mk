@@ -1,0 +1,90 @@
+#!/usr/bin/python
+# -*- encoding: utf-8; py-indent-offset: 4 -*-
+# +------------------------------------------------------------------+
+# |             ____ _               _        __  __ _  __           |
+# |            / ___| |__   ___  ___| | __   |  \/  | |/ /           |
+# |           | |   | '_ \ / _ \/ __| |/ /   | |\/| | ' /            |
+# |           | |___| | | |  __/ (__|   <    | |  | | . \            |
+# |            \____|_| |_|\___|\___|_|\_\___|_|  |_|_|\_\           |
+# |                                                                  |
+# | Copyright Mathias Kettner 2014             mk@mathias-kettner.de |
+# +------------------------------------------------------------------+
+#
+# This file is part of Check_MK.
+# The official homepage is at http://mathias-kettner.de/check_mk.
+#
+# check_mk is free software;  you can redistribute it and/or modify it
+# under the  terms of the  GNU General Public License  as published by
+# the Free Software Foundation in version 2.  check_mk is  distributed
+# in the hope that it will be useful, but WITHOUT ANY WARRANTY;  with-
+# out even the implied warranty of  MERCHANTABILITY  or  FITNESS FOR A
+# PARTICULAR PURPOSE. See the  GNU General Public License for more de-
+# ails.  You should have  received  a copy of the  GNU  General Public
+# License along with GNU Make; see the file  COPYING.  If  not,  write
+# to the Free Software Foundation, Inc., 51 Franklin St,  Fifth Floor,
+# Boston, MA 02110-1301 USA.
+
+
+# Example output from agent (German Windows XP)
+# <<<win_netstat>>>
+#
+# Aktive Verbindungen
+#
+#   Proto  Lokale Adresse         Remoteadresse          Status
+#   TCP    0.0.0.0:135            0.0.0.0:0              ABHREN
+#   TCP    0.0.0.0:445            0.0.0.0:0              ABHREN
+#   TCP    0.0.0.0:2869           0.0.0.0:0              ABHREN
+#   TCP    0.0.0.0:6556           0.0.0.0:0              ABHREN
+#   TCP    10.1.1.99:139          0.0.0.0:0              ABHREN
+#   TCP    10.1.1.99:445          10.1.1.123:52820       HERGESTELLT
+#   TCP    10.1.1.99:6556         10.1.1.50:43257        WARTEND
+#   TCP    10.1.1.99:6556         10.1.1.50:43288        WARTEND
+#   TCP    10.1.1.99:6556         10.1.1.50:43309        WARTEND
+#   TCP    127.0.0.1:1029         127.0.0.1:5354         HERGESTELLT
+#   TCP    127.0.0.1:1030         0.0.0.0:0              ABHREN
+#   TCP    127.0.0.1:1040         127.0.0.1:27015        HERGESTELLT
+#   TCP    127.0.0.1:5354         0.0.0.0:0              ABHREN
+#   TCP    127.0.0.1:5354         127.0.0.1:1029         HERGESTELLT
+#   TCP    127.0.0.1:27015        0.0.0.0:0              ABHREN
+#   TCP    127.0.0.1:27015        127.0.0.1:1040         HERGESTELLT
+#   UDP    0.0.0.0:445            *:*
+#   UDP    0.0.0.0:500            *:*
+#   UDP    127.0.0.1:1042         *:*
+#   UDP    127.0.0.1:1900         *:*
+
+win_netstat_states = {
+  # German
+  "ABH\x99REN"  : "LISTENING",
+  "HERGESTELLT" : "ESTABLISHED",
+  "WARTEND"     : "TIME_WAIT",
+  # Add further states in any required language here. Sorry, Windows
+  # has no "unset LANG" ;-)
+}
+
+
+def parse_win_netstat(info):
+    connections = []
+    for line in info:
+        if line[0] == "TCP":
+            proto, local, remote, connstate = line
+        elif line[0] == "UDP":
+            proto, local, remote = line
+            connstate = "LISTEN"
+        else:
+            continue
+        connections.append( (proto, local.rsplit(":", 1), remote.rsplit(":", 1),
+                             win_netstat_states.get(connstate, connstate)) )
+    return connections
+
+
+def check_win_netstat(item, params, info):
+    connections = parse_win_netstat(info)
+    return check_netstat_generic(item, params, connections)
+
+
+check_info["win_netstat"] = {
+    'check_function'        : check_win_netstat,
+    'service_description'   : "TCP Connection %s",
+    'group'                 : "tcp_connections",
+    'includes'              : [ "netstat.include" ],
+}

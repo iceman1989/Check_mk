@@ -1,0 +1,10 @@
+Title: New option to use expect string in response heads for check_http in WATO
+Level: 1
+Component: checks
+Version: 1.2.5i1
+Date: 1391680748
+Class: feature
+
+The parameter -d from <tt>check_http</tt> (string to expect in the response headers) can now be set via WATO.
+
+

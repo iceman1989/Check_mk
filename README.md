@@ -1,4 +1,4 @@
 Check_mk
 ========
 
-Check_mk (dual-stack)
+Check_mk (with IPv6 support)

@@ -699,6 +699,13 @@ def get_agent_info_program(commandline):
             raise MKAgentError("Agent exited with code %d: %s" % (exitstatus, stderr))
     return stdout
 
+def is_ipv6(address):
+    try:
+        socket.inet_pton(socket.AF_INET6, address)
+    except socket.error:  # not a valid address
+        return False
+    return True
+
 # Get data in case of TCP
 def get_agent_info_tcp(hostname, ipaddress, port = None):
     if not ipaddress:
